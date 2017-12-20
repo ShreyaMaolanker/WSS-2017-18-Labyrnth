@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <mraa.hpp>
-#include "../OLEDDisplay.h"
+#include "OLEDDisplay.h"
 
 using std::chrono::steady_clock;
 using namespace GFX;
@@ -62,10 +62,10 @@ i2c.writeReg(0x6B, 0x80);
 usleep(100*1000);
 
 
-	float x0 = 1;
-	float x1 = 1;
-	float y0 = 1;
-	float y1 = 1;
+	float x0 = 64;
+	float x1 = x0;
+	float y0 = 64;
+	float y1 = y0;
 
 	float xnew0 = 0;
 	float xnew1 = 0;
@@ -80,7 +80,8 @@ usleep(100*1000);
 	float accx = 0;
 	float accy = 0;
 	
-	float dt = 2;
+	float dt = 0.5;
+	float friction = 0.98;
 
 	//	while(1);
 
@@ -88,9 +89,9 @@ usleep(100*1000);
 	lcd.drawRect(10,10,10,10);
 	
 	usleep(100000);
+	i2c.writeReg(0x6B, 0x00);
 	while (true) 
 	{
-	i2c.writeReg(0x6B, 0x00);
 	//read raw accelerometer values
 	uint8_t acc_raw[6];
 	int len =i2c.readBytesReg(0x3B, acc_raw,6);
@@ -103,7 +104,7 @@ usleep(100*1000);
 		int16_t ay_raw = (int16_t) ((acc_raw[2]<<8) + acc_raw[3]);
 		int16_t az_raw = (int16_t) ((acc_raw[4]<<8) + acc_raw[5]);
 		
-		accx = ax_raw / 16384.0f;
+		accx = ax_raw / -16384.0f;
 		accy = ay_raw / 16384.0f;
 		float az = az_raw / 16384.0f;
 /*		
@@ -114,14 +115,16 @@ usleep(100*1000);
 	
 
 
-		speedx1 = speedx + (accx*dt);
-		speedy1 = speedy + (accy*dt);
+		speedx1 = (speedx + (accx*dt)) * friction;
+		speedy1 = (speedy + (accy*dt)) * friction;
 
 		xnew0 = xnew1 = x0 + (speedx1*dt);
 		ynew0 = ynew1 = y0 + (speedy1*dt);
 
-		usleep(1000000);
+		//usleep(1000000);
 		lcd.clearScreen();
+		
+	/*
 	lcd.drawLine(100,0,100,100);	
 		if((xnew1 >= 100) && (ynew1>= 0 || ynew1 <= 100))
 		{
@@ -140,12 +143,20 @@ usleep(100*1000);
 
 		
 		}
-
+         */
+         
+         if (xnew0 < 2) { xnew0=2; speedx1=0;}
+         if (xnew0 > 125) { xnew0=125; speedx1=0;}
+         if (ynew0 < 2) { ynew0=2; speedy1=0;}
+         if (ynew0 > 125) { ynew0=125; speedy1=0;}
+         
+		printf("in while, x0: %f, x1: %f, y0: %f, y1: %f,speedx = %f,speedy = %f,accx = %f,accy = %f\n",xnew0,xnew1,ynew0,ynew1,speedx1,speedy1,accx,accy);
+			lcd.drawCircle(xnew0,ynew0,2);
 
 		speedx = speedx1;
-		speedy1 = speedy;
-		x0 = xnew1;
-		y0 = ynew1;
+		speedy = speedy1;
+		x0 = xnew0;
+		y0 = ynew0;
 	
 		lcd.flush();
 
